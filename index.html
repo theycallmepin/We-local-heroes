@@ -1952,11 +1952,13 @@ const alphabet = [
 const vowels = ['a', 'i', 'u', 'e', 'o'];
 const consonants = ['b','c','d','f','g','h','j','k','l','m','n','p','r','s','t','v','w','y','z'];
 
-// baris per konsonan: [{consonant:'b', syllables:['ba','bi','bu','be','bo']}, ...]
-const sukuRows = consonants.map((c) => ({
-  consonant: c,
-  syllables: vowels.map((v) => c + v),
-}));
+// Urutan belajar: kenalan vokal (a i u e o) dulu, baru suku kata
+// dikelompokkan PER VOKAL (semua -a dulu, baru semua -i, dst) —
+// bukan per konsonan — sesuai metode mengeja klasik.
+const sukuFlatRounds = [
+  ...vowels.map((v) => ({ kind: 'vowel', display: v, pool: 'vowel-intro' })),
+  ...vowels.flatMap((v) => consonants.map((c) => ({ kind: 'syllable', display: c + v, vowel: v, pool: `vowel-${v}` }))),
+];
 
 // ---------- DATA: KATA (susun huruf) ----------
 const kataWords = [
@@ -2356,13 +2358,16 @@ const level4Rounds = [
 ];
 
 const level3Rounds = [
+  // a-group dulu
   { pattern: 'an', word: 'makan' },
   { pattern: 'an', word: 'kantor' },
   { pattern: 'ar', word: 'kabar' },
+  // lalu i-group
   { pattern: 'in', word: 'pintu' },
-  { pattern: 'um', word: 'minum' },
   { pattern: 'ing', word: 'kucing' },
   { pattern: 'ing', word: 'pancing' },
+  // lalu u-group
+  { pattern: 'um', word: 'minum' },
   { pattern: 'ung', word: 'gunung' },
   { pattern: 'ung', word: 'langsung' },
 ];
@@ -2370,16 +2375,18 @@ const level3Rounds = [
 // ---------- DATA: SUKU KATA LEVEL 5 (TENGAH) ----------
 // Pola suku kata tertutup/konsonan rangkap di TENGAH kata, bukan di ujung.
 const level5Rounds = [
+  // a-group dulu
   { pattern: 'mak', word: 'makna', syl: 'mak · na' },
   { pattern: 'ang', word: 'angka', syl: 'ang · ka' },
   { pattern: 'bang', word: 'bangsa', syl: 'bang · sa' },
   { pattern: 'sam', word: 'sampah', syl: 'sam · pah' },
+  { pattern: 'tang', word: 'tangga', syl: 'tang · ga' },
+  { pattern: 'kam', word: 'kampung', syl: 'kam · pung' },
+  // lalu e, i, o, u
+  { pattern: 'sem', word: 'sempit', syl: 'sem · pit' },
+  { pattern: 'ping', word: 'pinggang', syl: 'ping · gang' },
   { pattern: 'lom', word: 'lompat', syl: 'lom · pat' },
   { pattern: 'jum', word: 'jumpa', syl: 'jum · pa' },
-  { pattern: 'tang', word: 'tangga', syl: 'tang · ga' },
-  { pattern: 'sem', word: 'sempit', syl: 'sem · pit' },
-  { pattern: 'kam', word: 'kampung', syl: 'kam · pung' },
-  { pattern: 'ping', word: 'pinggang', syl: 'ping · gang' },
 ];
 
 
@@ -2412,8 +2419,7 @@ const state = {
   dongengPageIndex: 0,
   dongengSelesai: [],
   hurufIndex: 0,
-  sukuRowIndex: 0,
-  sukuPos: 0,
+  sukuIndex: 0,
   kataIndex: 0,
   kataPos: 0,
   kalimatIndex: 0,
@@ -2536,39 +2542,40 @@ function startHurufGame() {
 
 // ---------- MODUL: SUKU KATA ----------
 function renderSukuRound() {
-  const row = sukuRows[state.sukuRowIndex];
-  const syllable = row.syllables[state.sukuPos];
-  const vowel = vowels[state.sukuPos];
+  const current = sukuFlatRounds[state.sukuIndex];
+  const display = current.display;
 
-  document.getElementById('suku-row-info').textContent = `Baris ${row.consonant.toUpperCase()} (${state.sukuRowIndex + 1}/${sukuRows.length})`;
-  document.getElementById('suku-big').textContent = syllable;
-  document.getElementById('suku-caption').textContent = `${row.consonant.toUpperCase()} + ${vowel.toUpperCase()} = ${syllable}`;
-  document.getElementById('suku-prompt').textContent = `Yuk, cari suku kata ${syllable}!`;
+  if (current.kind === 'vowel') {
+    document.getElementById('suku-row-info').textContent = `Mengenal Vokal (${state.sukuIndex + 1}/${sukuFlatRounds.length})`;
+    document.getElementById('suku-caption').textContent = `Huruf vokal: ${display.toUpperCase()}`;
+  } else {
+    document.getElementById('suku-row-info').textContent = `Baris ${current.vowel.toUpperCase()} (${state.sukuIndex + 1}/${sukuFlatRounds.length})`;
+    document.getElementById('suku-caption').textContent = `${display[0].toUpperCase()} + ${current.vowel.toUpperCase()} = ${display}`;
+  }
+  document.getElementById('suku-big').textContent = display;
+  document.getElementById('suku-prompt').textContent = `Yuk, cari suku kata ${display}!`;
   document.getElementById('suku-feedback').innerHTML = '&nbsp;';
-  document.getElementById('suku-progress-label').textContent = `${state.sukuPos + 1} / ${row.syllables.length}`;
-  document.getElementById('suku-progress-fill').style.width = `${(state.sukuPos / row.syllables.length) * 100}%`;
+  document.getElementById('suku-progress-label').textContent = `${state.sukuIndex + 1} / ${sukuFlatRounds.length}`;
+  document.getElementById('suku-progress-fill').style.width = `${(state.sukuIndex / sukuFlatRounds.length) * 100}%`;
 
-  const others = shuffle(row.syllables.filter((s) => s !== syllable)).slice(0, 2);
-  const options = shuffle([syllable, ...others]);
+  const pool = sukuFlatRounds.filter((r) => r.pool === current.pool && r.display !== display);
+  const others = shuffle(pool).slice(0, 2).map((r) => r.display);
+  const options = shuffle([display, ...others]);
 
   renderOptions('suku-options', options, (btn, value) => {
     const feedback = document.getElementById('suku-feedback');
-    if (value === syllable) {
+    if (value === display) {
       btn.classList.add('is-correct');
       feedback.textContent = '🎉 Benar! Hebat!';
       state.stars += 1;
       updateStarDisplays();
       playCorrectSound();
       document.querySelectorAll('#suku-options .option-btn').forEach((b) => (b.disabled = true));
-      saveProgress({ suku_kata_terakhir: syllable });
+      saveProgress({ suku_kata_terakhir: display });
 
       setTimeout(() => {
-        state.sukuPos += 1;
-        if (state.sukuPos >= row.syllables.length) {
-          state.sukuPos = 0;
-          state.sukuRowIndex += 1;
-        }
-        if (state.sukuRowIndex < sukuRows.length) {
+        state.sukuIndex += 1;
+        if (state.sukuIndex < sukuFlatRounds.length) {
           renderSukuRound();
         } else {
           document.getElementById('suku-progress-fill').style.width = '100%';
@@ -2589,7 +2596,7 @@ function renderSukuRound() {
 }
 
 function startSukuGame() {
-  if (state.sukuRowIndex >= sukuRows.length) { state.sukuRowIndex = 0; state.sukuPos = 0; }
+  if (state.sukuIndex >= sukuFlatRounds.length) state.sukuIndex = 0;
   document.getElementById('suku-game-section').hidden = false;
   document.getElementById('suku-done').hidden = true;
   state.sukuMistakes = 0;
@@ -3592,7 +3599,7 @@ function startGambarGame() {
 // ---------- MODUL: PROGRESKU ----------
 const progresModules = [
   { area: 'Membaca', emoji: '🔤', title: 'Mengenal Huruf', total: alphabet.length, key: 'huruf_terakhir', kind: 'alphabet' },
-  { area: 'Membaca', emoji: '🔡', title: 'Suku Kata Level 1', total: sukuRows.length * vowels.length, key: 'suku_kata_terakhir', kind: 'suku' },
+  { area: 'Membaca', emoji: '🔡', title: 'Suku Kata Level 1', total: sukuFlatRounds.length, key: 'suku_kata_terakhir', kind: 'suku' },
   { area: 'Membaca', emoji: '🔠', title: 'Suku Kata Level 2', total: sukuLanjutanRounds.length, key: 'suku_lanjutan_terakhir', kind: 'lanjutan' },
   { area: 'Membaca', emoji: '🔤', title: 'Suku Kata Level 3: Akhiran', total: level3Rounds.length, key: 'suku_level3_terakhir', kind: 'level3' },
   { area: 'Membaca', emoji: '📝', title: 'Lengkapi Kalimat', total: level4Rounds.length, key: 'suku_level4_terakhir', kind: 'roundIndex' },
@@ -3630,8 +3637,7 @@ function computeModuleDone(mod, raw) {
       return idx >= 0 ? idx + 1 : 0;
     }
     case 'suku': {
-      const flat = sukuRows.flatMap((r) => r.syllables);
-      const idx = flat.indexOf(saved);
+      const idx = sukuFlatRounds.findIndex((r) => r.display === saved);
       return idx >= 0 ? idx + 1 : 0;
     }
     case 'kata': {
@@ -3972,17 +3978,10 @@ function findHurufResumeIndex(savedLetter) {
   return idx >= 0 ? Math.min(idx + 1, alphabet.length - 1) : 0;
 }
 
-function findSukuResume(savedSyllable) {
-  if (!savedSyllable || savedSyllable === 'selesai') return { rowIndex: 0, pos: 0 };
-  for (let r = 0; r < sukuRows.length; r++) {
-    const p = sukuRows[r].syllables.indexOf(savedSyllable);
-    if (p >= 0) {
-      const nextPos = p + 1;
-      if (nextPos < sukuRows[r].syllables.length) return { rowIndex: r, pos: nextPos };
-      return { rowIndex: Math.min(r + 1, sukuRows.length - 1), pos: 0 };
-    }
-  }
-  return { rowIndex: 0, pos: 0 };
+function findSukuFlatIndex(savedDisplay) {
+  if (!savedDisplay || savedDisplay === 'selesai') return 0;
+  const idx = sukuFlatRounds.findIndex((r) => r.display === savedDisplay);
+  return idx >= 0 ? Math.min(idx + 1, sukuFlatRounds.length - 1) : 0;
 }
 
 function findKataResumeIndex(savedWord) {
@@ -4135,9 +4134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.childName = profile?.nama || username;
     state.stars = profile?.bintang || 0;
     state.hurufIndex = findHurufResumeIndex(profile?.huruf_terakhir);
-    const sukuResume = findSukuResume(profile?.suku_kata_terakhir);
-    state.sukuRowIndex = sukuResume.rowIndex;
-    state.sukuPos = sukuResume.pos;
+    state.sukuIndex = findSukuFlatIndex(profile?.suku_kata_terakhir);
     state.kataIndex = findKataResumeIndex(profile?.kata_terakhir);
     state.kalimatIndex = findKalimatResumeIndex(profile?.kalimat_terakhir);
     state.sukuLanjutanIndex = findLanjutanResumeIndex(profile?.suku_lanjutan_terakhir);
@@ -4236,12 +4233,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showScreen('screen-suku-hub');
   });
   document.getElementById('btn-listen-suku').addEventListener('click', () => {
-    const row = sukuRows[state.sukuRowIndex];
-    speak(row.syllables[state.sukuPos]);
+    speak(sukuFlatRounds[state.sukuIndex].display);
   });
   document.getElementById('btn-replay-suku').addEventListener('click', () => {
-    state.sukuRowIndex = 0;
-    state.sukuPos = 0;
+    state.sukuIndex = 0;
     startSukuGame();
   });
 
